@@ -253,7 +253,7 @@ export class BikeSimulator {
     private createStravaGpx(lines: [number, number, number, Recording][]) {
         const gpxData = new StravaBuilder();
         const points = lines.map(([long, lat, ele, entry]) => new Point(lat, long, {
-            ele,
+            ele: Math.round(ele * 10) / 10,
             time: new Date(entry.time),
             power: Math.round(entry.power),
             distance: Math.round(entry.distance * 100) / 100,
