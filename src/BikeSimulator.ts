@@ -241,7 +241,7 @@ export class BikeSimulator {
     }
 
     public export(): void {
-        const lines: [number, number, number, Recording][] = this.recording.map((entry) => {
+        const lines: [number, number, number, Recording][] = this.recording.filter((entry) => !!entry).map((entry) => {
             const pos = this.getPosByDistance(entry.distance);
             return [pos.longitude, pos.latitude, pos.elevation, entry];
         });
