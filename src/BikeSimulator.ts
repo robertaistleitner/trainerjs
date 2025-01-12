@@ -7,6 +7,7 @@ import { BikeTrainer, BikeTrainerData } from "./BikeTrainer";
 import { padStart } from 'lodash';
 import { buildGPX, StravaBuilder } from 'gpx-builder';
 import { Segment, Track } from "gpx-builder/dist/builder/BaseBuilder/models";
+import { HeartRateMonitor, HeartRateMonitorData } from "./HeartRateMonitor";
 const { Point } = StravaBuilder.MODELS;
 
 const CHART_METRICS = [
@@ -82,6 +83,18 @@ export class BikeSimulator {
     private subprogress: number = 0;
     private lastRender: number = performance.now();
     private bikeTrainer: BikeTrainer = null;
+    private bikeTrainerData: BikeTrainerData = {
+        break_temp: 0,
+        cadence: 0,
+        distance: 0,
+        heart_rate: 0,
+        power: 0,
+        slope: 0,
+        speed: 0,
+        weight: 0,
+    };
+    private heartRateMonitor: HeartRateMonitor = null;
+    private heartRateMonitorData: HeartRateMonitorData = {heart_rate: 0};
     private recording: Recording[] = [];
     private activeChartMetric: number = 1;
     private chart: Chart = null;
@@ -97,7 +110,7 @@ export class BikeSimulator {
     private pauseElement: HTMLElement = null;
     private overlayPausedElement: HTMLElement = null;
 
-    constructor(bikeTrainer: BikeTrainer, {
+    constructor(bikeTrainer: BikeTrainer, heartRateMonitor: HeartRateMonitor, {
         gpxFileInputId,
         overlayElementId,
         gameElementId,
@@ -117,6 +130,7 @@ export class BikeSimulator {
         this.subprogress = 0;
         this.lastRender = performance.now();
         this.bikeTrainer = bikeTrainer;
+        this.heartRateMonitor = heartRateMonitor;
         this.recording = [];
         this.activeChartMetric = 1;
         this.gpx = null;
@@ -130,6 +144,10 @@ export class BikeSimulator {
             this.bikeTrainer.onButtonUp = this.onButtonUp.bind(this);
             this.bikeTrainer.onButtonRight = this.onButtonRight.bind(this);
             this.bikeTrainer.onButtonLeft = this.onButtonLeft.bind(this);
+        }
+
+        if (this.heartRateMonitor != null) {
+            this.heartRateMonitor.onDataUpdated = this.onHeartRateDataUpdated.bind(this);
         }
 
         this.gpxFileInput = document.getElementById(gpxFileInputId) as HTMLInputElement;
@@ -298,6 +316,9 @@ export class BikeSimulator {
         this.startElement.style.display = "none";
 
         try {
+            this.initElement.innerHTML = "Connecting to heart rate monitor ...";
+            await this.heartRateMonitor.connect();
+
             this.initElement.innerHTML = "Connecting to bike trainer ...";
             await this.bikeTrainer.connect();
 
@@ -330,12 +351,23 @@ export class BikeSimulator {
     }
 
     public onDataUpdated(bikeTrainerData: BikeTrainerData) {
+        this.bikeTrainerData = bikeTrainerData;
+        this.updateOverlay();
+    }
+
+    public onHeartRateDataUpdated(heartRateMonitorData: HeartRateMonitorData) {
+        this.heartRateMonitorData = heartRateMonitorData;
+        this.updateOverlay();
+    }
+
+    public updateOverlay() {
         this.overlayElement.innerHTML = `
-            <div style="display:flex"><div style="flex-grow:1">Speed:</div><div>${Math.round(bikeTrainerData.speed * 10) / 10} km/h</div></div>
-            <div style="display:flex"><div style="flex-grow:1">Cadence:</div><div>${Math.round(bikeTrainerData.cadence)}</div></div>
-            <div style="display:flex"><div style="flex-grow:1">Power:</div><div>${Math.round(bikeTrainerData.power)} Watts</div></div>
-            <div style="display:flex"><div style="flex-grow:1">Distance:</div><div>${Math.round((bikeTrainerData.distance + this.offset) / 10) / 100} km (${Math.round((bikeTrainerData.distance + this.offset) * 1000 / (this.smoothedSegments.length * 20)) / 10}%)</div></div>
-            <div style="display:flex"><div style="flex-grow:1">Slope:</div><div>${Math.round(bikeTrainerData.slope * 10) / 10}%</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Speed:</div><div>${Math.round(this.bikeTrainerData.speed * 10) / 10} km/h</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Cadence:</div><div>${Math.round(this.bikeTrainerData.cadence)}</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Power:</div><div>${Math.round(this.bikeTrainerData.power)} Watts</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Distance:</div><div>${Math.round((this.bikeTrainerData.distance + this.offset) / 10) / 100} km (${Math.round((this.bikeTrainerData.distance + this.offset) * 1000 / (this.smoothedSegments.length * 20)) / 10}%)</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Slope:</div><div>${Math.round(this.bikeTrainerData.slope * 10) / 10}%</div></div>
+            <div style="display:flex"><div style="flex-grow:1">Heart Rate:</div><div>${this.heartRateMonitorData.heart_rate}</div></div>
         `;
     }
 
@@ -364,13 +396,14 @@ export class BikeSimulator {
     }
 
     public onDistanceUpdated(distance: number): void {
-        const { slope } = this.bikeTrainer.getData();
+        const bikeTrainerData = this.bikeTrainer.getData();
+        const heartRateMonitorData = this.heartRateMonitor.getData();
         const corrected_distance = distance + this.offset;
         const nextIndex = Math.ceil(corrected_distance / 20);
         const nextSegment = this.smoothedSegments[nextIndex];
 
         if (nextSegment !== undefined) {
-            const nextSlope = Math.max(Math.min(nextSegment.slope, slope + BikeSimulator.MAX_SLOPE_CHANGE), slope - BikeSimulator.MAX_SLOPE_CHANGE);
+            const nextSlope = Math.max(Math.min(nextSegment.slope, bikeTrainerData.slope + BikeSimulator.MAX_SLOPE_CHANGE), bikeTrainerData.slope - BikeSimulator.MAX_SLOPE_CHANGE);
             this.bikeTrainer.setSlope(nextSlope);
             console.log("sent new slope of", nextSlope);
         }
@@ -378,7 +411,8 @@ export class BikeSimulator {
         if (!this.bikeTrainer.isPaused()) {
             if (Math.ceil(corrected_distance / 20) > Math.ceil(this.progressedDistance / 20)) {
                 this.recording[Math.floor(corrected_distance / 20)] = {
-                    ...this.bikeTrainer.getData(),
+                    ...bikeTrainerData,
+                    ...heartRateMonitorData,
                     distance: corrected_distance,
                     time: Date.now(),
                 };

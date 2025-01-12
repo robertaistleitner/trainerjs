@@ -37,7 +37,9 @@
             // const trainer = new TrainerJS.TestTrainer();
             const trainer = new TrainerJS.BushidoTrainer();
 
-            const bikeSimulator = new TrainerJS.BikeSimulator(trainer, {
+            const heartRateMonitor = new TrainerJS.BleHeartRateMonitor();
+
+            const bikeSimulator = new TrainerJS.BikeSimulator(trainer, heartRateMonitor, {
                 gpxFileInputId: "gpxFile",
                 overlayElementId: "overlay",
                 gameElementId: "game",
