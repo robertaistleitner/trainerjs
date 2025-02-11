@@ -49,6 +49,7 @@ export class BleHeartRateMonitor implements HeartRateMonitor {
   handleHeartRateChanged(event: Event): void {
     const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
     const heartRate = value.getUint8(1); // Heart rate value is at the second byte
+    console.info("received heart rate: %d", heartRate);
     this.currentHeartRate = heartRate;
     this.onDataUpdated && this.onDataUpdated({
         heart_rate: heartRate,

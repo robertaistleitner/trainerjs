@@ -315,6 +315,11 @@ export class BikeSimulator {
         this.initElement.style.display = "block";
         this.startElement.style.display = "none";
 
+        // aquire wake lock to prevent issues with losing connection to trainer/heart rate monitor
+        if ('wakeLock' in navigator) {
+            const wakeLock = await navigator.wakeLock.request("screen");
+        }
+
         try {
             this.initElement.innerHTML = "Connecting to heart rate monitor ...";
             await this.heartRateMonitor.connect();

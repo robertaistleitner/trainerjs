@@ -11,6 +11,7 @@
   "devDependencies": {
     "@types/cesium": "1.67.13",
     "@types/chart.js": "^2.9.34",
+    "@types/dom-screen-wake-lock": "^1.0.3",
     "@types/w3c-web-usb": "^1.0.5",
     "@types/web-bluetooth": "0.0.20",
     "copy-webpack-plugin": "^6.4.1",
