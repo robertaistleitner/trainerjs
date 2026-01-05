@@ -321,8 +321,10 @@ export class BikeSimulator {
         }
 
         try {
-            this.initElement.innerHTML = "Connecting to heart rate monitor ...";
-            await this.heartRateMonitor.connect();
+            if (this.heartRateMonitor) {
+                this.initElement.innerHTML = "Connecting to heart rate monitor ...";
+                await this.heartRateMonitor.connect();
+            }
 
             this.initElement.innerHTML = "Connecting to bike trainer ...";
             await this.bikeTrainer.connect();
